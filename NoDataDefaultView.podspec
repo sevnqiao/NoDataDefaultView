@@ -1,7 +1,7 @@
 #NoDataDefaultView.podspec
 Pod::Spec.new do |s|
 s.name         = "NoDataDefaultView"
-s.version      = "0.0.4"
+s.version      = "0.0.1"
 s.summary      = "a light weight and easy to use NoDataDefaultView"
 s.homepage     = "https://github.com/sevnqiao/NoDataDefaultView"
 s.license      = 'MIT'
