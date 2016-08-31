@@ -31,10 +31,10 @@ static char NoDataDefaultViewKey;
             [self.noDataDefaultView removeFromSuperview];
         }
     }else{
-        
-        self.noDataDefaultView = [[NoDataDefaultView alloc]initWithFrame:self.frame];
+        if (!self.noDataDefaultView) {
+            self.noDataDefaultView = [[NoDataDefaultView alloc]initWithFrame:self.frame];
+        }
         [self addSubview:self.noDataDefaultView];
-        
         [self.noDataDefaultView configDefaultWithTitle:title type:type reloadHandler:block];
     }
     
@@ -43,14 +43,11 @@ static char NoDataDefaultViewKey;
 
 @end
 
-@interface NoDataDefaultView ()
+
+@implementation NoDataDefaultView
 {
     void (^reloadMathodBlock)(id);
 }
-@end
-
-@implementation NoDataDefaultView
-
 - (void)configDefaultWithTitle:(NSString *)title type:(DefaultViewType)type reloadHandler:(void(^)(UIButton *sender))block{
     UILabel *_textLabel;
     UIImageView *_imageView;
