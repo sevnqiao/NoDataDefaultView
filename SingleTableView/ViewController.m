@@ -9,15 +9,24 @@
 #import "ViewController.h"
 #import "UIView+NoDataDefaultView.h"
 #import "Contact.h"
+#import "ContactsManager.h"
+#import <ContactsUI/ContactsUI.h>
 
-#import <AddressBookUI/ABPeoplePickerNavigationController.h>
-#import <AddressBook/ABPerson.h>
-#import <AddressBookUI/ABPersonViewController.h>
-#import <AddressBook/AddressBook.h>
+//#import <AddressBookUI/ABPeoplePickerNavigationController.h>
+//#import <AddressBook/ABPerson.h>
+//#import <AddressBookUI/ABPersonViewController.h>
+//#import <AddressBook/AddressBook.h>
+//
+//#import <MessageUI/MessageUI.h>
 
 
-@interface ViewController ()<ABPeoplePickerNavigationControllerDelegate,UITableViewDelegate,UITableViewDataSource,ABPersonViewControllerDelegate>
-@property (strong, nonatomic) UITableView         *tableView;
+@interface ViewController ()<UISearchBarDelegate, UITableViewDelegate, UITableViewDataSource, ABPersonViewControllerDelegate, CNContactViewControllerDelegate, ABNewPersonViewControllerDelegate>
+@property (strong, nonatomic) UITableView *tableView;
+
+@property (nonatomic, strong) UIView *searchBackView;
+@property (nonatomic, strong) UISearchBar *searchBar;
+@property (nonatomic, strong) UIButton *searchCancleBtn;
+
 @property (nonatomic, strong) NSMutableDictionary *dataDict;
 @property (nonatomic, strong) NSMutableArray *titleArray;
 
@@ -29,22 +38,54 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
     
+    
+    // 解决代码上升的问题
+    self.navigationController.navigationBar.translucent = NO;
+    self.tabBarController.tabBar.translucent = NO;
+    
     self.navigationItem.title = @"通讯录";
     
-    _tableView = [[UITableView alloc]initWithFrame:self.view.bounds style:UITableViewStyleGrouped];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addContact:)];
+    
+    UIBarButtonItem *editItem = [[UIBarButtonItem alloc]initWithBarButtonSystemItem:UIBarButtonSystemItemEdit target:self action:@selector(editContactList:)];
+    
+    UIBarButtonItem *refreshItem = [[UIBarButtonItem alloc]initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshContactList:)];
+    
+    self.navigationItem.leftBarButtonItems = @[editItem, refreshItem];
+    
+    _searchBackView = [[UIView alloc]initWithFrame:CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, 40)];
+    _searchBackView.backgroundColor = [UIColor lightGrayColor];
+    [self.view addSubview:_searchBackView];
+    
+    _searchBar = [[UISearchBar alloc]initWithFrame:CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, 40)];
+    _searchBar.backgroundColor = [UIColor lightGrayColor];
+    _searchBar.placeholder = @"搜索";
+    _searchBar.delegate = self;
+    [_searchBackView addSubview:_searchBar];
+    
+    _searchCancleBtn = [[UIButton alloc]initWithFrame:CGRectMake( [UIScreen mainScreen].bounds.size.width, 0, 60, 40)];
+    [_searchCancleBtn setTitle:@"取消" forState: UIControlStateNormal];
+    [_searchCancleBtn setTitleColor:[UIColor blueColor] forState:UIControlStateNormal];
+    _searchCancleBtn.backgroundColor = [UIColor lightGrayColor];
+    [_searchCancleBtn addTarget:self action:@selector(cancleSearch:) forControlEvents:UIControlEventTouchUpInside];
+    [_searchBackView addSubview:_searchCancleBtn];
+    
+    
+    _tableView = [[UITableView alloc]initWithFrame:CGRectMake(0, 40, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height-104) style:UITableViewStyleGrouped];
     _tableView.dataSource = self;
     _tableView.delegate = self;
+    self.tableView.backgroundColor = [UIColor whiteColor];
     [self.view addSubview:_tableView];
     
     [self loadPerson];
 }
 
-
-#pragma mark - UITableViewDelegate/UITableViewDataSource
+#pragma mark - UITableViewDataSource
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView{
     
     return _titleArray.count;
 }
+
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section{
 
     NSString *character = _titleArray[section];
@@ -57,6 +98,7 @@
     }
     return 0;
 }
+
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath{
     
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"identify"];
@@ -83,29 +125,7 @@
     return cell;
 }
 
-- (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section{
-    return CGFLOAT_MIN;
-}
-
-- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section{
-    return 30;
-}
-
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
-{
-    return _titleArray[section];
-}
-
-
-
-#pragma mark - 右侧索引
-- (NSArray *)sectionIndexTitlesForTableView:(UITableView *)tableView
-{
-    return _titleArray;
-}
-
-- (NSInteger)tableView:(UITableView *)tableView sectionForSectionIndexTitle:(NSString *)title atIndex:(NSInteger)index
-{
+- (NSInteger)tableView:(UITableView *)tableView sectionForSectionIndexTitle:(NSString *)title atIndex:(NSInteger)index{
     NSInteger count = 0;
     
     for(NSString *character in _titleArray)
@@ -119,6 +139,54 @@
     return 0;
 }
 
+- (NSArray *)sectionIndexTitlesForTableView:(UITableView *)tableView{
+    return _titleArray;
+}
+
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath{
+    
+    if (editingStyle == UITableViewCellEditingStyleDelete) {
+
+        NSString *character = _titleArray[indexPath.section];
+        
+        NSMutableArray *arr = [_dataDict valueForKey:character];
+        
+        Contact *contact = arr[indexPath.row];
+        
+        BOOL success = [[ContactsManager shareManager]removeContactRef:contact.person];
+        
+        if (!success) {
+            return;
+        }
+        [arr removeObject:contact];
+        
+        [_dataDict removeObjectForKey:character];
+        
+        if (arr.count == 0) {
+            [_titleArray removeObject:character];
+            [self.tableView deleteSections:[NSIndexSet indexSetWithIndex:indexPath.section] withRowAnimation:UITableViewRowAnimationAutomatic];
+            
+        }else{
+            [_dataDict setValue:arr forKey:character];
+            [self.tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+        }
+
+    }
+}
+
+
+#pragma mark - UITableViewDelegate
+- (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section{
+    return CGFLOAT_MIN;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section{
+    return 30;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section{
+    return _titleArray[section];
+}
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath{
     
@@ -130,20 +198,139 @@
     
     Contact *contact = arr[indexPath.row];
     
-    ABPersonViewController *nav = [[ABPersonViewController alloc] init];
+    id vc = [[ContactsManager shareManager]contactDetailViewControllerWithContactRef:contact.person];
+    if ([vc isKindOfClass:[CNContactViewController class]]) {
+        
+        ((CNContactViewController *)vc).delegate = self;
+        
+    }else if ([vc isKindOfClass:[ABPersonViewController class]]) {
+        
+        ((ABPersonViewController *)vc).personViewDelegate = self;
+    }
     
-    nav.personViewDelegate = self;
     
-    nav.navigationItem.title = [NSString stringWithFormat:@"%@%@%@",contact.lastName?:@"",contact.firstName?:@"",contact.middlename?:@""];
+    [self.navigationController pushViewController:vc animated:YES];
+    
+}
 
-    nav.displayedPerson = contact.aBRecordRef;
-    
-    [self.navigationController pushViewController:nav animated:YES];
+- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath{
+    return UITableViewCellEditingStyleDelete;
 }
 
 
-- (BOOL)personViewController:(ABPersonViewController *)personViewController shouldPerformDefaultActionForPerson:(ABRecordRef)person property:(ABPropertyID)property identifier:(ABMultiValueIdentifier)identifier
-{
+#pragma mark - UISearchBarDelegate
+- (void)searchBarTextDidBeginEditing:(UISearchBar *)searchBar{
+    
+    [self.navigationController setNavigationBarHidden:YES animated:YES];
+    
+    [UIView animateWithDuration:0.25 animations:^{
+        
+        _searchBackView.frame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, 60);
+        
+        _searchBar.frame = CGRectMake(0, 20, [UIScreen mainScreen].bounds.size.width - 60, 40);
+
+        _searchCancleBtn.frame = CGRectMake([UIScreen mainScreen].bounds.size.width - 60, 20, 60, 40);
+        
+        _tableView.frame = CGRectMake(0, 60, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height-40);
+        
+    }];
+}
+- (void)cancleSearch:(UIButton *)sender{
+    [self.view endEditing:YES];
+    
+    [self.navigationController setNavigationBarHidden:NO animated:YES];
+    
+    [UIView animateWithDuration:1 animations:^{
+        
+        _searchBackView.frame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, 40);
+        
+        _searchBar.frame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, 40);
+        
+        _searchCancleBtn.frame = CGRectMake([UIScreen mainScreen].bounds.size.width, 0, 60, 40);
+        
+        _tableView.frame = CGRectMake(0, 40, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height-104);
+    }];
+}
+
+
+
+#pragma mark - CNContactViewControllerDelegate
+- (BOOL)contactViewController:(CNContactViewController *)viewController shouldPerformDefaultActionForContactProperty:(CNContactProperty *)property{
+    NSString *resultStr = [self getResultStrWithValue:property.value property:property];
+    
+    NSLog(@"%@", resultStr);
+    
+    return NO;
+}
+
+- (void)contactViewController:(CNContactViewController *)viewController didCompleteWithContact:(nullable CNContact *)contact{
+    if (contact == nil) {
+        [viewController dismissViewControllerAnimated:YES completion:nil];
+    }else{
+        [self refreshContactList:nil];
+    }
+}
+
+- (NSString *)getResultStrWithValue:(id)value property:(CNContactProperty *)property{
+    __block NSString *resultStr;
+    if ([value isKindOfClass:[NSDate class]]) {
+        
+        NSDateFormatter *formatter = [[NSDateFormatter alloc]init];
+        formatter.dateFormat = @"yyyy-MM-dd";
+        resultStr = [formatter stringFromDate:value];
+        
+    }else if ([value isKindOfClass:[CNPostalAddress class]]) {
+        
+        CNPostalAddress *address = value;
+        resultStr = [NSString stringWithFormat:@"%@%@%@%@(%@)",address.country, address.city, address.state, address.street, address.postalCode];
+        
+    }else if ([value isKindOfClass:[CNPhoneNumber class]]) {
+        
+        CNPhoneNumber *phone = value;
+        resultStr = [NSString stringWithFormat:@"%@", phone.stringValue];
+        
+    }else if ([value isKindOfClass:[NSDateComponents class]]) {
+        
+        NSDateComponents *componets = value;
+        
+        resultStr = [NSString stringWithFormat:@"%04ld-%02ld-%02ld", componets.year, componets.month, componets.day];
+        
+    }else if ([value isKindOfClass:[CNContactRelation class]]) {
+        
+        CNContactRelation *relation = value;
+        
+        resultStr = [NSString stringWithFormat:@"name = %@", relation.name];
+        
+    }else if ([value isKindOfClass:[CNSocialProfile class]]) {
+        
+        CNSocialProfile *profile = value;
+        
+        resultStr = [NSString stringWithFormat:@"name = %@, url = %@", profile.username, profile.urlString];
+        
+    }else {
+        if (value) {
+            
+            resultStr = value;
+        }else{
+            
+            NSArray *arr = [property.contact valueForKey:property.key];
+            
+            [arr enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                if ([obj isKindOfClass:[CNLabeledValue class]]) {
+                    CNLabeledValue *value = obj;
+                    if ([value.identifier isEqualToString:property.identifier]) {
+                        resultStr = [self getResultStrWithValue:value.value property:nil];
+                    }
+                }
+            }];
+        }
+    }
+    
+    return resultStr;
+}
+
+#pragma mark - ABPersonViewControllerDelegate
+- (BOOL)personViewController:(ABPersonViewController *)personViewController shouldPerformDefaultActionForPerson:(ABRecordRef)person property:(ABPropertyID)property identifier:(ABMultiValueIdentifier)identifier{
     NSMutableString *returnStr = [NSMutableString string];
 
     switch (property) {
@@ -198,224 +385,61 @@
     
 }
 
+- (void)newPersonViewController:(ABNewPersonViewController *)newPersonView didCompleteWithNewPerson:(nullable ABRecordRef)person{
+    if (person) {
+        [self refreshContactList:nil];
+    }
+    [newPersonView dismissViewControllerAnimated:YES completion:nil];
+}
+
 #pragma mark - 获取联系人
 - (void)loadPerson{
-    ABAddressBookRef addressBookRef = ABAddressBookCreateWithOptions(NULL, NULL);
     
-    if (ABAddressBookGetAuthorizationStatus() == kABAuthorizationStatusNotDetermined) {
-        ABAddressBookRequestAccessWithCompletion(addressBookRef, ^(bool granted, CFErrorRef error){
-            
-            CFErrorRef *error1 = NULL;
-            ABAddressBookRef addressBook = ABAddressBookCreateWithOptions(NULL, error1);
-            [self copyAddressBook:addressBook];
-        });
-    }
-    else if (ABAddressBookGetAuthorizationStatus() == kABAuthorizationStatusAuthorized){
+    if ([[ContactsManager shareManager] authorizationStatus]) {
         
-        CFErrorRef *error = NULL;
-        ABAddressBookRef addressBook = ABAddressBookCreateWithOptions(NULL, error);
-        [self copyAddressBook:addressBook];
-    }
-    else {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            // 更新界面
-            //            [hud turnToError:@"没有获取通讯录权限"];
-        });
+        NSArray *contactArr = [[ContactsManager shareManager] loadAllSystemContacts];
+        
+        [self.tableView configDefaultView:contactArr.count>0 title:@"暂无联系人" type: DefaultViewTypeDefault reloadHandler:^(UIButton *sender) {
+            [self loadPerson];
+        }];
+        
+        [self getDataDcitWithContactArr:contactArr];
+        
+    }else{
+        
     }
 }
 
-// 转换为联系人实体
-- (void)copyAddressBook:(ABAddressBookRef)addressBook{
-    CFIndex numberOfPeople = ABAddressBookGetPersonCount(addressBook);
-    CFArrayRef people = ABAddressBookCopyArrayOfAllPeople(addressBook);
-    
-    NSMutableArray *contactArr = [NSMutableArray array];
-    
-    for ( int i = 0; i < numberOfPeople; i++){
-        Contact *contact = [Contact new];
-        
-        contact.aBRecordRef = addressBook;
-        
-        ABRecordRef person = CFArrayGetValueAtIndex(people, i);
-        
-        contact.aBRecordRef = person;
-        
-        contact.firstName = (__bridge NSString *)(ABRecordCopyValue(person, kABPersonFirstNameProperty));
-        contact.lastName = (__bridge NSString *)(ABRecordCopyValue(person, kABPersonLastNameProperty));
-        
-        //读取middlename
-        contact.middlename = (__bridge NSString*)ABRecordCopyValue(person, kABPersonMiddleNameProperty);
-        
-        contact.pinyinName = [self transform:[NSString stringWithFormat:@"%@%@%@",contact.lastName?:@"" ,contact.firstName?:@"" ,contact.middlename?:@"" ]];
-        
-        //读取prefix前缀
-        contact.prefix = (__bridge NSString*)ABRecordCopyValue(person, kABPersonPrefixProperty);
-        //读取suffix后缀
-        contact.suffix = (__bridge NSString*)ABRecordCopyValue(person, kABPersonSuffixProperty);
-        //读取nickname呢称
-        contact.nickname = (__bridge NSString*)ABRecordCopyValue(person, kABPersonNicknameProperty);
-        //读取firstname拼音音标
-        contact.firstnamePhonetic = (__bridge NSString*)ABRecordCopyValue(person, kABPersonFirstNamePhoneticProperty);
-        //读取lastname拼音音标
-        contact.lastnamePhonetic = (__bridge NSString*)ABRecordCopyValue(person, kABPersonLastNamePhoneticProperty);
-        //读取middlename拼音音标
-        contact.middlenamePhonetic = (__bridge NSString*)ABRecordCopyValue(person, kABPersonMiddleNamePhoneticProperty);
-        //读取organization公司
-        contact.organization = (__bridge NSString*)ABRecordCopyValue(person, kABPersonOrganizationProperty);
-        //读取jobtitle工作
-        contact.jobtitle = (__bridge NSString*)ABRecordCopyValue(person, kABPersonJobTitleProperty);
-        //读取department部门
-        contact.department = (__bridge NSString*)ABRecordCopyValue(person, kABPersonDepartmentProperty);
-        //读取birthday生日
-        contact.birthday = (__bridge NSDate*)ABRecordCopyValue(person, kABPersonBirthdayProperty);
-        //读取note备忘录
-        contact.note = (__bridge NSString*)ABRecordCopyValue(person, kABPersonNoteProperty);
-        //第一次添加该条记录的时间
-        contact.firstknow = (__bridge NSString*)ABRecordCopyValue(person, kABPersonCreationDateProperty);
-        //最后一次修改該条记录的时间
-        contact.lastknow = (__bridge NSString*)ABRecordCopyValue(person, kABPersonModificationDateProperty);
-        
-        //获取email多值
-        ABMultiValueRef emailInfo = ABRecordCopyValue(person, kABPersonEmailProperty);
-        
-        for (int x = 0; x < ABMultiValueGetCount(emailInfo); x++)
-        {
-            Email *email = [Email new];
-            //获取email Label
-            email.emailLabel = (__bridge NSString*)ABAddressBookCopyLocalizedLabel(ABMultiValueCopyLabelAtIndex(emailInfo, x));
-            //获取email值
-            email.emailContent = (__bridge NSString*)ABMultiValueCopyValueAtIndex(emailInfo, x);
-            
-            [contact.emails addObject:email];
-        }
-        //读取地址多值
-        ABMultiValueRef addressInfo = ABRecordCopyValue(person, kABPersonAddressProperty);
-        
-        for(int j = 0; j < ABMultiValueGetCount(addressInfo); j++)
-        {
-            Address *address = [Address new];
-            
-            address.addressLabel = (__bridge NSString*)ABAddressBookCopyLocalizedLabel(ABMultiValueCopyLabelAtIndex(addressInfo, j));
-            NSDictionary *personaddress =(__bridge NSDictionary*) ABMultiValueCopyValueAtIndex(addressInfo, j);
-            address.country = [personaddress valueForKey:(NSString *)kABPersonAddressCountryKey];
-            address.city = [personaddress valueForKey:(NSString *)kABPersonAddressCityKey];
-            address.state = [personaddress valueForKey:(NSString *)kABPersonAddressStateKey];
-            address.street = [personaddress valueForKey:(NSString *)kABPersonAddressStreetKey];
-            address.zip = [personaddress valueForKey:(NSString *)kABPersonAddressZIPKey];
-            address.coutntry = [personaddress valueForKey:(NSString *)kABPersonAddressCountryCodeKey];
-            
-            [contact.address addObject:address];
-        }
-        
-        //获取dates多值
-        ABMultiValueRef datesInfo = ABRecordCopyValue(person, kABPersonDateProperty);
-        
-        for (int y = 0; y < ABMultiValueGetCount(datesInfo); y++)
-        {
-            Date *date = [Date new];
-            
-            date.datesLabel = (__bridge NSString*)ABAddressBookCopyLocalizedLabel(ABMultiValueCopyLabelAtIndex(datesInfo, y));
-            date.datesContent = (__bridge NSString*)ABMultiValueCopyValueAtIndex(datesInfo, y);
-            
-            [contact.dates addObject:date];
-        }
-        //获取kind值
-        //        CFNumberRef recordType = ABRecordCopyValue(person, kABPersonKindProperty);
-        //        if (recordType == kABPersonKindOrganization) {
-        //            // it's a company
-        //            NSLog(@"it's a company\n");
-        //        } else {
-        //            // it's a person, resource, or room
-        //            NSLog(@"it's a person, resource, or room\n");
-        //        }
-        
-        
-        //获取IM多值
-        ABMultiValueRef instantMessage = ABRecordCopyValue(person, kABPersonInstantMessageProperty);
-        for (int l = 1; l < ABMultiValueGetCount(instantMessage); l++)
-        {
-            Message *message = [Message new];
-            //获取IM Label
-            message.instantMessageLabel = (__bridge NSString*)ABMultiValueCopyLabelAtIndex(instantMessage, l);
-            //获取該label下的2属性
-            NSDictionary* instantMessageContent =(__bridge NSDictionary*) ABMultiValueCopyValueAtIndex(instantMessage, l);
-            message.username = [instantMessageContent valueForKey:(NSString *)kABPersonInstantMessageUsernameKey];
-            
-            message.service = [instantMessageContent valueForKey:(NSString *)kABPersonInstantMessageServiceKey];
-            
-            [contact.instantMessage addObject:message];
-        }
-        
-        //读取电话多值
-        ABMultiValueRef phoneInfo = ABRecordCopyValue(person, kABPersonPhoneProperty);
-        for (int k = 0; k<ABMultiValueGetCount(phoneInfo); k++)
-        {
-            Phone *phone = [Phone new];
-            //获取电话Label
-            phone.personPhoneLabel = (__bridge NSString*)ABAddressBookCopyLocalizedLabel(ABMultiValueCopyLabelAtIndex(phoneInfo, k));
-            //获取該Label下的电话值
-            phone.personPhone = (__bridge NSString*)ABMultiValueCopyValueAtIndex(phoneInfo, k);
-            
-            [contact.phone addObject:phone];
-        }
-        
-        //获取URL多值
-        ABMultiValueRef urlInfo = ABRecordCopyValue(person, kABPersonURLProperty);
-        for (int m = 0; m < ABMultiValueGetCount(urlInfo); m++)
-        {
-            Url *url = [Url new];
-            //获取电话Label
-            url.urlLabel = (__bridge NSString*)ABAddressBookCopyLocalizedLabel(ABMultiValueCopyLabelAtIndex(urlInfo, m));
-            //获取該Label下的电话值
-            url.urlContent = (__bridge NSString*)ABMultiValueCopyValueAtIndex(urlInfo,m);
-            
-            [contact.url addObject:url];
-        }
-        
-        //读取照片
-        contact.image = (__bridge NSData*)ABPersonCopyImageData(person);
-        
-        [contactArr addObject:contact];
-    }
-    
-    [self.tableView configDefaultView:contactArr.count>0 title:@"暂无联系人" type: DefaultViewTypeDefault reloadHandler:^(UIButton *sender) {
-        [self loadPerson];
-    }];
-    
-    [self getDataDcitWithContactArr:contactArr];
-}
-
-- (void)getDataDcitWithContactArr:(NSArray *)contactArr{
+- (void)getDataDcitWithContactArr:(NSArray *)contactArr{// 排序和分类
     
     _dataDict = [NSMutableDictionary dictionary];
     
     [contactArr enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-        if (idx != contactArr.count-1) {
-            
-            Contact *contact = (Contact *)obj;
-            NSString *name = [NSString stringWithFormat:@"%@%@%@",contact.lastName?:@"",contact.firstName?:@"",contact.middlename?:@""];
-            
-            NSString *sortStr = [self transform:name].length>0?[[self transform:name] substringToIndex:1]:@"";
-            
-            if ([_dataDict valueForKey:sortStr]) {
-                NSMutableArray *arr = [_dataDict valueForKey:sortStr];
-                [arr addObject:contact];
-                
-                [self sortArray:arr withKey:@"pinyinName"];
-                
-                [_dataDict removeObjectForKey:sortStr];
-                [_dataDict setObject:arr forKey:sortStr];
-            }else{
-                NSMutableArray *arr = [NSMutableArray array];
-                [arr addObject:contact];
-                [_dataDict setObject:arr forKey:sortStr];
-            }
 
+        Contact *contact = (Contact *)obj;
+        NSString *name = [NSString stringWithFormat:@"%@%@%@",contact.lastName?:@"",contact.firstName?:@"",contact.middlename?:@""];
+        
+        NSString *sortStr = [NSString transform:name].length>0?[[NSString transform:name] substringToIndex:1]:@"";
+        
+        if ([_dataDict valueForKey:sortStr]) {
+            NSMutableArray *arr = [_dataDict valueForKey:sortStr];
+            [arr addObject:contact];
+            
+            [arr sortWithKey:@"pinyinName"];
+            
+            [_dataDict removeObjectForKey:sortStr];
+            [_dataDict setObject:arr forKey:sortStr];
         }else{
+            NSMutableArray *arr = [NSMutableArray array];
+            [arr addObject:contact];
+            [_dataDict setObject:arr forKey:sortStr];
+        }
+        
+        if (idx == contactArr.count-1) {
             
             NSMutableArray *keysArr = [NSMutableArray arrayWithArray:_dataDict.allKeys];
             
-            [self sortArray:keysArr withKey:@""];
+            [keysArr sortWithKey:@""];
             
             _titleArray = [NSMutableArray arrayWithArray:keysArr];
             
@@ -436,7 +460,7 @@
                 }
                 
             }];
-
+            
             [_tableView reloadData];
         }
         
@@ -444,19 +468,48 @@
     }];
 }
 
-- (NSString *)transform:(NSString *)chinese
-{
-    NSMutableString *pinyin = [chinese mutableCopy];
-    CFStringTransform((__bridge CFMutableStringRef)pinyin, NULL, kCFStringTransformMandarinLatin, NO);
-    CFStringTransform((__bridge CFMutableStringRef)pinyin, NULL, kCFStringTransformStripCombiningMarks, NO);
-    return [[pinyin uppercaseString] stringByReplacingOccurrencesOfString:@" " withString:@""];
+#pragma mark - barButtonItemEvent
+- (void)addContact:(UIBarButtonItem *)item{
+    
+    id vc = [[ContactsManager shareManager]newContactViewControllerWithContactRef:nil];
+    
+    if ([vc isKindOfClass:[CNContactViewController class]]) {
+        
+        ((CNContactViewController *)vc).delegate = self;
+        [self.navigationController pushViewController:vc animated:YES];
+        
+    }else if ([vc isKindOfClass:[ABNewPersonViewController class]]){
+        
+        ((ABNewPersonViewController *)vc).newPersonViewDelegate = self;
+        [self presentViewController:[[UINavigationController alloc] initWithRootViewController:vc] animated:YES completion:nil];
+    }
+    
+    
 }
 
-- (void)sortArray:(NSMutableArray *)arr withKey:(NSString *)sortKey{
+- (void)editContactList:(UIBarButtonItem *)item{
+    if (self.tableView.isEditing) {
+        
+        [self.tableView setEditing:NO animated:YES];
+        item.style = UIBarButtonSystemItemAdd;
+    }else{
+        
+        [self.tableView setEditing:YES animated:YES];
+        item.style = UIBarButtonSystemItemCancel;
+    }
     
-    NSSortDescriptor *sortDescriptor = [[NSSortDescriptor alloc] initWithKey:sortKey ascending:YES];
-    
-    [arr sortUsingDescriptors:@[sortDescriptor]];
-
 }
+
+- (void)refreshContactList:(UIBarButtonItem *)item{
+    
+    [_titleArray removeAllObjects];
+    
+    [_dataDict removeAllObjects];
+    
+    [self loadPerson];
+    
+    [self.tableView reloadData];
+    
+}
+
 @end

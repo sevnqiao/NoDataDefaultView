@@ -12,7 +12,7 @@
 
 @interface Contact : NSObject
 
-@property (nonatomic) ABRecordRef aBRecordRef;
+@property (nonatomic) id person;
 
 @property (nonatomic, copy  ) NSString *firstName;
 
@@ -91,7 +91,7 @@
 //获取dates Label
 @property (nonatomic, copy) NSString* datesLabel;
 //获取dates值
-@property (nonatomic, copy) NSString* datesContent;
+@property (nonatomic, copy) NSDate* datesContent;
 @end
 
 
