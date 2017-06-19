@@ -72,13 +72,11 @@
     {
         CNContactStore *contactStore = [ContactsManager shareStore];
         
-
-//        NSArray *keys = @[CNContactIdentifierKey, CNContactNamePrefixKey ,CNContactGivenNameKey ,CNContactMiddleNameKey ,CNContactFamilyNameKey ,CNContactPreviousFamilyNameKey ,CNContactNameSuffixKey ,CNContactNicknameKey ,CNContactPhoneticGivenNameKey ,CNContactPhoneticMiddleNameKey ,CNContactPhoneticFamilyNameKey ,CNContactOrganizationNameKey ,CNContactDepartmentNameKey ,CNContactJobTitleKey ,CNContactBirthdayKey ,CNContactNonGregorianBirthdayKey ,CNContactNoteKey ,CNContactImageDataKey ,CNContactThumbnailImageDataKey ,CNContactImageDataAvailableKey ,CNContactTypeKey ,CNContactPhoneNumbersKey ,CNContactEmailAddressesKey ,CNContactPostalAddressesKey ,CNContactDatesKey ,CNContactUrlAddressesKey ,CNContactRelationsKey ,CNContactSocialProfilesKey ,CNContactInstantMessageAddressesKey];
         
-        NSArray *arrrrr = [CNContact descriptorForAllComparatorKeys];
+        //        NSArray *keys = @[CNContactIdentifierKey, CNContactNamePrefixKey ,CNContactGivenNameKey ,CNContactMiddleNameKey ,CNContactFamilyNameKey ,CNContactPreviousFamilyNameKey ,CNContactNameSuffixKey ,CNContactNicknameKey ,CNContactPhoneticGivenNameKey ,CNContactPhoneticMiddleNameKey ,CNContactPhoneticFamilyNameKey ,CNContactOrganizationNameKey ,CNContactDepartmentNameKey ,CNContactJobTitleKey ,CNContactBirthdayKey ,CNContactNonGregorianBirthdayKey ,CNContactNoteKey ,CNContactImageDataKey ,CNContactThumbnailImageDataKey ,CNContactImageDataAvailableKey ,CNContactTypeKey ,CNContactPhoneNumbersKey ,CNContactEmailAddressesKey ,CNContactPostalAddressesKey ,CNContactDatesKey ,CNContactUrlAddressesKey ,CNContactRelationsKey ,CNContactSocialProfilesKey ,CNContactInstantMessageAddressesKey];
         
         
-        // 这个地方甚是奇怪, 系统给出的 key 只有上面那些,  可是如果少了下面里面多出来的几个,就跳转不了呢, 
+        // 这个地方甚是奇怪, 系统给出的 key 只有上面那些,  可是如果少了下面里面多出来的几个,就跳转不了呢,
         NSMutableArray *keys2 =[NSMutableArray arrayWithArray:@[@"fullscreenImageData",@"textAlert",@"dates",@"middleName",@"nickname",@"preferredForImage",@"socialProfiles",@"organizationName",@"imageData",@"calendarURIs",@"pronunciationGivenName",@"pronunciationFamilyName",@"emailAddresses",@"birthday",@"imageDataAvailable",@"nameSuffix",@"nonGregorianBirthday",@"phoneNumbers",@"phoneticGivenName",@"previousFamilyName",@"familyName",@"urlAddresses",@"identifier",@"thumbnailImageData",@"contactType",@"departmentName",@"callAlert",@"cropRect",@"contactRelations",@"postalAddresses",@"instantMessageAddresses",@"mapsData",@"preferredForName",@"linkIdentifier",@"namePrefix",@"phoneticMiddleName",@"jobTitle",@"iOSLegacyIdentifier",@"phoneticFamilyName",@"note",@"givenName"]];
         
         CNContactFetchRequest *request = [[CNContactFetchRequest alloc]initWithKeysToFetch:keys2];
