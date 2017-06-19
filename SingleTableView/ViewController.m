@@ -399,7 +399,8 @@
         
         NSArray *contactArr = [[ContactsManager shareManager] loadAllSystemContacts];
         
-        [self.tableView configDefaultView:contactArr.count>0 title:@"暂无联系人" type: DefaultViewTypeDefault reloadHandler:^(UIButton *sender) {
+        [self.tableView configNoDataDefaultViewWithViewType:NoDataDefaultViewTypeNoData isHasData:contactArr.count>0 handle:^{
+            
             [self loadPerson];
         }];
         
@@ -407,6 +408,15 @@
         
     }else{
         
+        CNContactStore *contactStore = [[CNContactStore alloc] init];
+        [contactStore requestAccessForEntityType:CNEntityTypeContacts completionHandler:^(BOOL granted, NSError * _Nullable error) {
+            if (granted) {
+                // 成功
+                [self loadPerson];
+            } else {
+                // 失败
+            }
+        }];
     }
 }
 
