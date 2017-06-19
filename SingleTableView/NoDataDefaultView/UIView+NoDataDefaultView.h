@@ -1,48 +1,61 @@
 //
 //  UIView+NoDataDefaultView.h
-//  SingleTableView
+//  NoDataDefaultViewDemo
 //
-//  Created by xiong on 16/8/29.
-//  Copyright © 2016年 xiong. All rights reserved.
+//  Created by xiong on 2017/6/5.
+//  Copyright © 2017年 xiong. All rights reserved.
 //
 
 #import <UIKit/UIKit.h>
 
-
-typedef NS_ENUM(NSInteger, DefaultViewType) {
-    
-    DefaultViewTypeDefault = 1,
-    
-    
-};
-
 @class NoDataDefaultView;
 
+typedef NS_ENUM(NSInteger, NoDataDefaultViewType)
+{
+    NoDataDefaultViewTypeNoData = 1,
+    NoDataDefaultViewTypeNetworkError,
+    NoDataDefaultViewTypeNone
+};
+
+typedef void(^HandleBlock)();
+
 @interface UIView(NoDataDefaultView)
+
 @property (nonatomic, strong) NoDataDefaultView *noDataDefaultView;
-- (void)configDefaultView:(BOOL)isHaveData title:(NSString *)title type:(DefaultViewType)type reloadHandler:(void(^)(UIButton *sender))block;
+
+
+/**
+ 设置缺省页
+
+ @param viewType 页面类型
+ @param isHasData 是否有数据 yes 则不显示该缺省页
+ @param handle 重新加载按钮的处理事件
+ */
+- (void)configNoDataDefaultViewWithViewType:(NoDataDefaultViewType)viewType isHasData:(BOOL)isHasData handle:(HandleBlock)handle;
+
+
+/**
+  设置缺省页
+
+ @param viewType 页面类型
+ @param imageName 图片名
+ @param title 标题
+ @param detail 详细描述
+ @param isHasData 是否有数据 yes 则不显示该缺省页
+ @param handle 重新加载按钮的处理事件
+ */
+- (void)configNoDataDefaultViewWithImageName:(NSString *)imageName title:(NSString *)title detail:(NSString *)detail isHasData:(BOOL)isHasData handle:(HandleBlock)handle;
+
 @end
 
 
 
 @interface NoDataDefaultView:UIView
-- (void)configDefaultWithTitle:(NSString *)title type:(DefaultViewType)type reloadHandler:(void(^)(UIButton *sender))block;
+
+@property (nonatomic, copy) NSString *imageName;
+@property (nonatomic, copy) NSString *titleText;
+@property (nonatomic, copy) NSString *detailText;
+@property (nonatomic, copy) HandleBlock handleBlock;
+
 @end
 
-
-
-@interface NSString(Size)
-- (CGSize)getStringSizeWithWidth:(float)width font:(UIFont*)font;
-@end
-
-
-
-@interface UILabel(Init)
-+ (UILabel *)initWithTitle:(NSString *)title titleColor:(UIColor *)color font:(UIFont *)font textAlignment:(NSTextAlignment)textAlignment lineNum:(NSInteger)lineNum;
-@end
-
-
-
-@interface UIButton(Init)
-+ (UIButton *)initWithTitle:(NSString *)title titleColor:(UIColor *)color font:(UIFont *)font radius:(CGFloat)radius;
-@end
